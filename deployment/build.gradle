@@ -1,0 +1,57 @@
+//########### aws cloudformation ###########
+
+task publishtoecr(type: Exec) {
+    commandLine "ansible-playbook", "-i", "localhost,", "-c", "local",
+            "--extra-vars",
+            "region=${project.region} " +
+                    "env=${project.environment} " +
+                    "project_name=${rootProject.name} " +
+                    "service_name=message-service " +
+                    "version=${project.version}",
+            "publish.aws.yml", "-vv"
+}
+
+task deployaws(type: Exec) {
+    commandLine "ansible-playbook", "-i", "localhost,", "-c", "local",
+            "--extra-vars",
+            "region=${project.region} " +
+                    "env=${project.environment} " +
+                    "project_name=${rootProject.name} " +
+                    "version=${project.version}",
+            "deploy.aws.yml", "-vv"
+}
+
+task publishaws()
+
+publishaws.dependsOn(publishtoecr)
+
+
+
+//########### kubernetes ###########
+
+task deployk8s(type: Exec){
+    logging.captureStandardOutput  LogLevel.INFO
+    workingDir "roles/deploy.k8s"
+    commandLine "kubectl", "apply", "-f", "."
+}
+
+
+task deletek8s(type: Exec){
+    logging.captureStandardOutput  LogLevel.INFO
+    workingDir "roles/deploy.k8s"
+    commandLine "kubectl", "delete", "-f", "."
+}
+
+//########### docker-compose ###########
+
+task composeup(type: Exec) {
+    logging.captureStandardOutput  LogLevel.INFO
+    workingDir "roles/deploy.compose"
+    commandLine "docker-compose", "up"
+}
+
+task composedown(type: Exec){
+    logging.captureStandardOutput  LogLevel.INFO
+    workingDir "roles/deploy.compose"
+    commandLine "docker-compose", "down"
+}

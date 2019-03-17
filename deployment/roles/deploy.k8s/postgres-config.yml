@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+  labels:
+    app: postgres
+data:
+  db_name: demo
+  db_user: messageservice
+  db_password: secretpassword
+  db_host: postgres
+  db_port: "5432"

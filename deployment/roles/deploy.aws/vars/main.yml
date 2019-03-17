@@ -1,0 +1,12 @@
+---
+
+bucket_name: "{{ env }}.{{ project_name }}.bucket"
+stack_name: "{{ env }}-{{ project_name }}"
+
+ecs:
+  repository_name: "{{ env }}-{{ project_name }}"
+  messageapp:
+    tag: "message-service-{{ version | default('latest') }}"
+    memory: 512
+    cpu: 256
+    desired_count: 1

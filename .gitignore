@@ -1,0 +1,17 @@
+## Mac OS X
+.DS_Store
+
+## Gradle (https://github.com/github/gitignore/blob/master/Gradle.gitignore)
+.gradle
+.gradletasknamecache
+gradle-app.setting
+build/
+out/
+*.class
+
+## IntelliJ IDEA
+.iml
+.ipr
+.iws
+.idea/
+.bundle/

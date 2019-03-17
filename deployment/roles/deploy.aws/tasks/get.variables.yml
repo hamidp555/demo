@@ -1,0 +1,10 @@
+---
+
+- name: check for environment variable File
+  stat:
+    path: "{{ playbook_dir }}/roles/deploy.aws/environment/{{ env }}.yml"
+  register: variable_file
+
+- name: include environment variables
+  include_vars: "environment/{{ env }}.yml"
+  when: variable_file.stat.exists

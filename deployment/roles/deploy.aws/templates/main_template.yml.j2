@@ -1,0 +1,84 @@
+#jinja2: lstrip_blocks: True
+Description: Main stack template for {{ project_name }} {{ env }}
+
+Resources:
+
+  VPC:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/{{ bucket_name }}/cloudformation/vpc_template.yml
+      Tags:
+        - Key: Environment
+          Value: {{ env }}
+        - Key: Project
+          Value: {{ project_name }}
+        - Key: Version
+          Value: {{ version }}
+
+  SecurityGroups:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/{{ bucket_name }}/cloudformation/security_groups_template.yml
+      Parameters:
+        VPCId: !GetAtt VPC.Outputs.VPCId
+      Tags:
+      - Key: Environment
+        Value: {{ env }}
+      - Key: Project
+        Value: {{ project_name }}
+      - Key: Version
+        Value: {{ version }}
+
+  RDS:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/{{ bucket_name }}/cloudformation/rds_template.yml
+      Parameters:
+        DBSecurityGroupId: !GetAtt SecurityGroups.Outputs.DBSecurityGroupId
+        PrivateSubnet1Id: !GetAtt VPC.Outputs.PrivateSubnet1Id
+        PrivateSubnet2Id: !GetAtt VPC.Outputs.PrivateSubnet2Id
+        PrivateSubnet3Id: !GetAtt VPC.Outputs.PrivateSubnet3Id
+      Tags:
+      - Key: Environment
+        Value: {{ env }}
+      - Key: Project
+        Value: {{ project_name }}
+      - Key: Version
+        Value: {{ version }}
+
+  ECS:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/{{ bucket_name }}/cloudformation/messageapp_template.yml
+      Parameters:
+      {% for subnet in range(1,4) %}
+        PrivateSubnet{{ subnet }}Id: !GetAtt VPC.Outputs.PrivateSubnet{{ subnet }}Id
+        PublicSubnet{{ subnet }}Id: !GetAtt VPC.Outputs.PublicSubnet{{ subnet }}Id
+      {% endfor %}
+        VPCId: !GetAtt VPC.Outputs.VPCId
+        JDBCConnectionHost: !GetAtt RDS.Outputs.JDBCConnectionHost
+        MessagePublicLoadBalancerSG: !GetAtt SecurityGroups.Outputs.MessagePublicLoadBalancerSG
+        MessageServiceSG: !GetAtt SecurityGroups.Outputs.MessageServiceSG
+      Tags:
+      - Key: Environment
+        Value: {{ env }}
+      - Key: Project
+        Value: {{ project_name }}
+      - Key: Version
+        Value: {{ version }}
+
+  Route53:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/{{ bucket_name }}/cloudformation/route53_template.yml
+      Parameters:
+        MessagePublicLoadBalancerDNS: !GetAtt ECS.Outputs.MessagePublicLoadBalancerDNS
+        MessagePublicLoadBalancerZoneId: !GetAtt ECS.Outputs.MessagePublicLoadBalancerZoneId
+      Tags:
+      - Key: Environment
+        Value: {{ env }}
+      - Key: Project
+        Value: {{ project_name }}
+      - Key: Version
+        Value: {{ version }}
+

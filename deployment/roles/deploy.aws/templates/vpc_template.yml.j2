@@ -1,0 +1,188 @@
+#jinja2: lstrip_blocks: True
+Description: VPC stack template for {{ project_name }} {{ env }}
+
+Resources:
+  VPC:
+    Type: "AWS::EC2::VPC"
+    Properties:
+      CidrBlock: {{ vpc.cidr }}
+      EnableDnsHostnames: true
+      Tags:
+      - Key: Environment
+        Value: {{ env }}
+      - Key: Project
+        Value: {{ project_name }}
+      - Key: Version
+        Value: {{ version }}
+
+{### Subnets ###}
+{% for subnet in range(3) %}
+  PrivateSubnet{{ subnet + 1 }}:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+    {% if subnet == 0 %}
+      AvailabilityZone: {{ region }}a
+    {% elif subnet == 1 %}
+      AvailabilityZone: {{ region }}b
+    {% else %}
+      AvailabilityZone: {{ region }}c
+    {% endif %}
+      CidrBlock: "{{ vpc.cidr | ipsubnet(25, subnet) }}"
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Environment
+        Value: {{ env }}
+      - Key: Project
+        Value: {{ project_name }}
+      - Key: Version
+        Value: {{ version }}
+
+{% endfor %}
+
+{% for subnet in range(3) %}
+  PublicSubnet{{ subnet + 1 }}:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+    {% if subnet == 0 %}
+      AvailabilityZone: {{ region }}a
+    {% elif subnet == 1 %}
+      AvailabilityZone: {{ region }}b
+    {% else %}
+      AvailabilityZone: {{ region }}c
+    {% endif %}      CidrBlock: "{{ vpc.cidr | ipsubnet(25, subnet + 4) }}"
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Environment
+        Value: {{ env }}
+      - Key: Project
+        Value: {{ project_name }}
+      - Key: Version
+        Value: {{ version }}
+
+{% endfor %}
+{### End Subnets ###}
+
+
+{### Associate Subnets with Route Tables ###}
+{% for subnet in range(1,4) %}
+  PrivateSubnet{{ subnet }}Association:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+    {% if subnet is divisibleby 2 %}
+      RouteTableId: !Ref PrivateRouteTable2
+    {% else %}
+      RouteTableId: !Ref PrivateRouteTable1
+    {% endif %}
+      SubnetId: !Ref PrivateSubnet{{ subnet }}
+
+{% endfor %}
+
+{% for subnet in range(1,4) %}
+  PublicSubnet{{ subnet }}Association:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet{{ subnet }}
+
+{% endfor %}
+{### End Associate Subnets with Route Tables ###}
+
+
+  InternetGateway:
+    Type: "AWS::EC2::InternetGateway"
+    Properties:
+      Tags:
+      - Key: Environment
+        Value: {{ env }}
+      - Key: Project
+        Value: {{ project_name }}
+      - Key: Version
+        Value: {{ version }}
+
+  InternetGatewayAttachment:
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+
+{### NAT Gateways ###}
+{% for gateway in range(1,3) %}
+  NATGateway{{ gateway }}:
+    Type: "AWS::EC2::NatGateway"
+    Properties:
+      AllocationId: !GetAtt NATGatewayEIP{{ gateway }}.AllocationId
+      SubnetId: !Ref PublicSubnet{{ gateway }}
+      Tags:
+      - Key: Environment
+        Value: {{ env }}
+      - Key: Project
+        Value: {{ project_name }}
+      - Key: Version
+        Value: {{ version }}
+
+  NATGatewayEIP{{ gateway }}:
+    Type: "AWS::EC2::EIP"
+    Properties:
+      Domain: vpc
+
+{% endfor %}
+{### End NAT Gateways ###}
+
+
+{### Route Tables and Default Routes ###}
+  PublicRouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Environment
+        Value: {{ env }}
+      - Key: Project
+        Value: {{ project_name }}
+      - Key: Version
+        Value: {{ version }}
+
+  PublicDefaultRoute:
+    Type: "AWS::EC2::Route"
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref PublicRouteTable
+
+{% for table in range(1,3) %}
+  PrivateRouteTable{{ table }}:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Environment
+        Value: {{ env }}
+      - Key: Project
+        Value: {{ project_name }}
+      - Key: Version
+        Value: {{ version }}
+
+  PrivateDefaultRoute{{ table }}:
+    Type: "AWS::EC2::Route"
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGateway{{ table }}
+      RouteTableId: !Ref PrivateRouteTable{{ table }}
+
+{% endfor %}
+{### End Route Tables and Default Routes ###}
+
+
+Outputs:
+{% for subnet in range(1,4) %}
+  PrivateSubnet{{ subnet }}Id:
+    Value: !Ref PrivateSubnet{{ subnet }}
+
+  PublicSubnet{{ subnet }}Id:
+    Value: !Ref PublicSubnet{{ subnet }}
+
+{% endfor %}
+
+  VPCId:
+    Value: !Ref VPC

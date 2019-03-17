@@ -1,0 +1,13 @@
+---
+
+- name: Deploy Cloudformation template
+  cloudformation:
+    stack_name: "{{ stack_name }}"
+    state: "present"
+    region: "{{ region }}"
+    disable_rollback: true
+    template_url: "https://s3.amazonaws.com/{{ bucket_name }}/cloudformation/main_template.yml"
+    tags:
+      Stack: "{{ stack_name }}"
+      Environment: "{{ env }}"
+  register: main_stack

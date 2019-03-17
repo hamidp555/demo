@@ -1,0 +1,13 @@
+---
+
+- name: get certificate arn
+  command: "aws acm list-certificates --region {{ region }} --query 'CertificateSummaryList[?contains(DomainName,`{{ domain_name }}`)]'"
+  register: certificate_facts
+
+- name: store output
+  set_fact:
+    certificate_outputs: "{{ certificate_facts.stdout | from_json }}"
+
+- name: store certificate arn
+  set_fact:
+    certificate_arn: "{{ certificate_outputs[0].CertificateArn }}"

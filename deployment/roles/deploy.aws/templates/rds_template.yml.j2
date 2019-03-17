@@ -1,0 +1,60 @@
+Description: RDS stack template for {{ project_name }} {{ env }}
+
+Parameters:
+
+  PrivateSubnet1Id:
+    Type: String
+
+  PrivateSubnet2Id:
+    Type: String
+
+  PrivateSubnet3Id:
+    Type: String
+
+  DBSecurityGroupId:
+    Type: String
+
+Resources:
+  MasterDB:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBName: {{ database_name }}
+      Engine: postgres
+      EngineVersion: '9.6.5'
+      MasterUsername:  {{ database_username }}
+      MasterUserPassword: {{ database_password }}
+      DBInstanceClass:  {{ database_instance_class }}
+      AllocatedStorage: {{ database_storage }}
+      MultiAZ: {{ database_multiaz }}
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      VPCSecurityGroups:
+        - !Ref DBSecurityGroupId
+      Tags:
+      - Key: Environment
+        Value: {{ env }}
+      - Key: Project
+        Value: {{ project_name }}
+      - Key: Version
+        Value: {{ version }}
+
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: RDS Subnet Group
+      SubnetIds:
+        - !Ref PrivateSubnet1Id
+        - !Ref PrivateSubnet2Id
+        - !Ref PrivateSubnet3Id
+      Tags:
+      - Key: Environment
+        Value: {{ env }}
+      - Key: Project
+        Value: {{ project_name }}
+      - Key: Version
+        Value: {{ version }}
+
+Outputs:
+  JDBCConnectionHost:
+    Value: !GetAtt MasterDB.Endpoint.Address
+
+

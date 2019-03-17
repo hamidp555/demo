@@ -1,0 +1,19 @@
+---
+
+- name: run pre publish tasks
+  include_tasks: "pre.tasks/{{ item }}"
+  with_items:
+    - pre.create_ecr_repository.yml
+
+- name: get login command
+  command: "aws ecr get-login --registry-ids {{ identity.Account }} --no-include-email --region {{ region }}"
+  register: login_command
+
+- name: tag docker image
+  command: "docker tag  {{ project_name }}/{{ service_name }}:{{ version }}  {{ identity.Account }}.dkr.ecr.{{ region }}.amazonaws.com/{{ dest_repository_name }}:{{ image_tag }}"
+
+- name: login to ecr repo
+  command: "{{ login_command.stdout }}"
+
+- name: push docker image
+  command: "docker push  {{ identity.Account }}.dkr.ecr.{{ region }}.amazonaws.com/{{ dest_repository_name }}:{{ image_tag }}"

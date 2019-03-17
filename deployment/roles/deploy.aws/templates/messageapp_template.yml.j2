@@ -1,0 +1,221 @@
+Description: MessageApp stack template for {{ project_name }} {{ env }}
+
+
+Parameters:
+{% for subnet in range(1,4) %}
+  PublicSubnet{{ subnet }}Id:
+    Type: String
+
+  PrivateSubnet{{ subnet }}Id:
+    Type: String
+
+{% endfor %}
+
+  VPCId:
+    Type: String
+
+  JDBCConnectionHost:
+    Type: String
+
+  MessageServiceSG:
+    Type: String
+
+  MessagePublicLoadBalancerSG:
+    Type: String
+
+Resources:
+
+### ECS ###
+  DemoCluster:
+    Type: "AWS::ECS::Cluster"
+    Properties:
+      ClusterName: {{ env }}-{{ project_name }}
+
+  MessageService:
+    Type: "AWS::ECS::Service"
+    Properties:
+      Cluster: !Ref DemoCluster
+      DesiredCount: {{ ecs.messageapp.desired_count }}
+      LaunchType: "FARGATE"
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 75
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          SecurityGroups:
+            - !Ref MessageServiceSG
+          Subnets:
+            - !Ref PrivateSubnet1Id
+            - !Ref PrivateSubnet2Id
+            - !Ref PrivateSubnet3Id
+      TaskDefinition: !Ref MessageTaskDefinition
+      HealthCheckGracePeriodSeconds: 180
+      LoadBalancers:
+        - ContainerName: messageapp-container
+          ContainerPort: 8080
+          TargetGroupArn: !Ref TargetGroup
+
+  MessageTaskDefinition:
+    Type: "AWS::ECS::TaskDefinition"
+    Properties:
+      Family: messageapp
+      Cpu: {{ ecs.messageapp.cpu }}
+      Memory: {{ ecs.messageapp.memory }}
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+      - FARGATE
+      ContainerDefinitions:
+      - Name: messageapp-container
+        Cpu: {{ ecs.messageapp.cpu }}
+        Memory: {{ ecs.messageapp.memory }}
+        Image: !Join ['',[!Ref 'AWS::AccountId','.dkr.ecr.{{ region }}.amazonaws.com/{{ ecs.repository_name }}:{{ ecs.messageapp.tag }}']]
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group: /aws/ecs/{{ env }}-Demo/MessageService
+            awslogs-region: {{ region }}
+            awslogs-stream-prefix: messageapp
+        PortMappings:
+        - ContainerPort: 8080
+        Environment:
+        - Name: JAVA_OPTS
+          Value: !Join ['',[
+            ' -Dspring.jpa.hibernate.ddlauto={{ spring_jpa_hibernate_ddlauto }}',
+            ' -Dspring.profiles.active={{ spring_profiles_active }}',
+             !Join ['',[' -Ddemo.database.host=', !Ref JDBCConnectionHost]],
+            ' -Ddemo.database.name={{ database_name }}',
+            ' -Ddemo.database.port={{ database_port }}',
+            ' -Ddemo.database.username={{ database_username  }}',
+            ' -Ddemo.database.password={{ database_password }}',
+            ' -Dlogging.level.com.message={{ logging_level_com_message }}',
+            ' -XX:MaxRAM={{ (ecs.messageapp.memory * 0.85) | round | int }}m'
+          ]]
+        DockerLabels:
+         imageDigest: {{ messageapp_digest }}
+         version: {{ version }}
+      ExecutionRoleArn: !Ref MessageExecRoleTaskRole
+    DependsOn:
+    - 'MessageLogGroup'
+    - 'LoadBalancerRule'
+### End ECS ###
+
+### IAM Roles ###
+  MessageExecRoleTaskRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "ecs-tasks.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+
+  TaskExecutionPolicy:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: "ECSTaskPolicy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: "Allow"
+          Action:
+          - "ecr:GetAuthorizationToken"
+          - "ecr:BatchCheckLayerAvailability"
+          - "ecr:GetDownloadUrlForLayer"
+          - "ecr:BatchGetImage"
+          - "logs:CreateLogStream"
+          - "logs:PutLogEvents"
+          Resource: "*"
+      Roles:
+      - !Ref MessageExecRoleTaskRole
+
+### End IAM Roles ###
+
+### LoadBalancers ###
+  MessagePublicLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      LoadBalancerAttributes:
+      - Key: idle_timeout.timeout_seconds
+        Value: '30'
+      Subnets:
+        - !Ref PublicSubnet1Id
+        - !Ref PublicSubnet2Id
+        - !Ref PublicSubnet3Id
+      SecurityGroups: [!Ref 'MessagePublicLoadBalancerSG']
+      Tags:
+      - Key: Environment
+        Value: {{ env }}
+      - Key: Project
+        Value: {{ project_name }}
+      - Key: Version
+        Value: {{ version }}
+
+  MessagePublicLoadBalancerListener:
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+    Properties:
+      Certificates:
+        - CertificateArn: {{ certificate_arn }}
+      DefaultActions:
+      - TargetGroupArn: !Ref TargetGroup
+        Type: forward
+      LoadBalancerArn: !Ref MessagePublicLoadBalancer
+      Port: 443
+      Protocol: HTTPS
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 20
+      HealthCheckPath: /actuator/health
+      HealthCheckProtocol: HTTP
+      HealthCheckPort: 8080
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      TargetType: ip
+      Port: 8080
+      Protocol: HTTP
+      UnhealthyThresholdCount: 2
+      VpcId:
+        !Ref VPCId
+      Tags:
+      - Key: Environment
+        Value: {{ env }}
+      - Key: Project
+        Value: {{ project_name }}
+      - Key: Version
+        Value: {{ version }}
+
+  LoadBalancerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - TargetGroupArn: !Ref TargetGroup
+          Type: 'forward'
+      Conditions:
+        - Field: path-pattern
+          Values:
+          - "*"
+      ListenerArn: !Ref MessagePublicLoadBalancerListener
+      Priority: 1
+### End LoadBalancers ###
+
+### Log Groups ###
+  MessageLogGroup:
+    Type: "AWS::Logs::LogGroup"
+    Properties:
+      LogGroupName: /aws/ecs/{{ env }}-Demo/MessageService
+      RetentionInDays: {{ logging.retention }}
+### End Log Groups ###
+
+Outputs:
+  MessagePublicLoadBalancerDNS:
+    Value: !GetAtt MessagePublicLoadBalancer.DNSName
+
+  MessagePublicLoadBalancerZoneId:
+    Value: !GetAtt MessagePublicLoadBalancer.CanonicalHostedZoneID

@@ -1,0 +1,72 @@
+Description: SecurityGroups stack template for {{ project_name }} {{ env }}
+
+Parameters:
+  VPCId:
+    Type: String
+
+Resources:
+
+  MessagePublicLoadBalancerSG:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: Access to the public facing load balancer
+      VpcId: !Ref 'VPCId'
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: '443'
+          ToPort: '443'
+          Description: HTTPS From Public Internet
+      Tags:
+      - Key: Environment
+        Value: {{ env }}
+      - Key: Project
+        Value: {{ project_name }}
+      - Key: Version
+        Value: {{ version }}
+
+  MessageServiceSG:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      VpcId: !Ref 'VPCId'
+      GroupDescription: Allow access to Message Service
+      SecurityGroupIngress:
+        - SourceSecurityGroupId: !GetAtt MessagePublicLoadBalancerSG.GroupId
+          IpProtocol: tcp
+          FromPort: '8080'
+          ToPort: '8080'
+      Tags:
+      - Key: Environment
+        Value: {{ env }}
+      - Key: Project
+        Value: {{ project_name }}
+      - Key: Version
+        Value: {{ version }}
+
+  DBSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: Open database for access
+      VpcId: !Ref 'VPCId'
+      SecurityGroupIngress:
+        - SourceSecurityGroupId: !GetAtt MessageServiceSG.GroupId
+          IpProtocol: tcp
+          FromPort: '5432'
+          ToPort: '5432'
+      Tags:
+      - Key: Environment
+        Value: {{ env }}
+      - Key: Project
+        Value: {{ project_name }}
+      - Key: Version
+        Value: {{ version }}
+
+Outputs:
+  MessagePublicLoadBalancerSG:
+    Value: !Ref MessagePublicLoadBalancerSG
+
+  MessageServiceSG:
+    Value: !Ref MessageServiceSG
+
+  DBSecurityGroupId:
+    Value: !GetAtt DBSecurityGroup.GroupId

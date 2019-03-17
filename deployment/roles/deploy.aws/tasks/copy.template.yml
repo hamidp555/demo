@@ -1,0 +1,23 @@
+---
+
+- name: create the bucket if it doesn't exist
+  s3_bucket:
+    name: "{{ bucket_name }}"
+    region: "{{ region }}"
+    state: present
+    versioning: yes
+
+- name: copy templates to S3
+  aws_s3:
+    bucket: "{{ bucket_name }}"
+    object: "/cloudformation/{{ item }}"
+    region: "{{ region }}"
+    src: "{{ playbook_dir }}/roles/deploy.aws/files/cloudformation/{{ item }}"
+    mode: put
+  with_items:
+  - main_template.yml
+  - vpc_template.yml
+  - security_groups_template.yml
+  - messageapp_template.yml
+  - route53_template.yml
+  - rds_template.yml

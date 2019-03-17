@@ -1,0 +1,23 @@
+---
+
+- name: get aws account id
+  command: "aws sts get-caller-identity --region {{ region }}"
+  register: output_identitiy
+
+- set_fact:
+    identity: "{{ output_identitiy.stdout | from_json }}"
+
+- name: get the list of exisiting repositories
+  command: "aws ecr describe-repositories --region {{ region }} --registry-id {{ identity.Account }} --no-paginate"
+  register: output_repos
+
+- set_fact:
+    existing_repos: "{{ output_repos.stdout | from_json }}"
+
+- set_fact:
+    existing_repo_names: "{{ existing_repos.repositories | map(attribute='repositoryName') | list }}"
+
+- name: create repository
+  command: "aws ecr --region {{ region }} create-repository --repository-name {{ dest_repository_name }}"
+  when: "dest_repository_name not in existing_repo_names"
+  register: output_repository

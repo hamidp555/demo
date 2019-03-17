@@ -1,0 +1,53 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: postgres
+  name: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        env:
+          - name: POSTGRES_DB
+            valueFrom:
+              configMapKeyRef:
+                name: postgres-config
+                key: db_name
+          - name: POSTGRES_USER
+            valueFrom:
+              configMapKeyRef:
+                name: postgres-config
+                key: db_user
+          - name: POSTGRES_PASSWORD
+            valueFrom:
+              configMapKeyRef:
+                name: postgres-config
+                key: db_password
+        image: postgres:9.6
+        livenessProbe:
+          exec:
+            command:
+              - sh
+              - -c
+              - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+          failureThreshold: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - mountPath: /var/lib/postgresql/data
+          name: database
+      volumes:
+      - name: database
+        persistentVolumeClaim:
+          claimName: database-pvc

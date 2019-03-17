@@ -1,0 +1,20 @@
+---
+
+- name: get env variables
+  include_tasks: get.variables.yml
+
+- name: run pre stack deployment tasks
+  include_tasks: "pre.tasks/{{ item }}"
+  with_items:
+    - pre.route53.yml
+    - pre.messageapp.yml
+    - pre.certificate.yml
+
+- name: create cloudformation templates
+  include_tasks: create.template.yml
+
+- name: copy templates to s3
+  include_tasks: copy.template.yml
+
+- name: deploy templates
+  include_tasks: deploy.template.yml

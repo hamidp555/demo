@@ -1,0 +1,6 @@
+rootProject.name = 'demo'
+
+include 'services:message-service'
+include 'tests:components'
+include 'deployment'
+

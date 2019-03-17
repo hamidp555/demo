@@ -1,0 +1,4 @@
+---
+
+dest_repository_name: "{{ env }}-{{ project_name }}"
+image_tag: "{{ service_name }}-{{ version }}"

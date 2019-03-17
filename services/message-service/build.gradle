@@ -1,0 +1,104 @@
+buildscript {
+    ext {
+        springBootVersion = '2.0.3.RELEASE'
+        springfoxVersion = '2.8.0' // json API documentation fro API's built with Spring
+        codeCoverageLimit = 0.7 // Increase step by step up to 0.7
+    }
+    repositories {
+        mavenCentral()
+        jcenter()
+    }
+    dependencies {
+        classpath "org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}"
+        classpath 'org.owasp:dependency-check-gradle:3.2.1'
+    }
+}
+
+apply plugin: 'java'
+apply plugin: 'org.springframework.boot'
+apply plugin: 'io.spring.dependency-management'
+apply plugin: 'jacoco'
+apply plugin: 'org.owasp.dependencycheck'
+
+repositories {
+    mavenCentral()
+    jcenter()
+}
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+dependencies {
+
+    compile 'org.springframework.boot:spring-boot-starter-actuator'
+    compile 'org.springframework.boot:spring-boot-starter-web'
+    compile "org.springframework.boot:spring-boot-starter-data-jpa"
+    compile 'org.hibernate.validator:hibernate-validator'
+    compile 'org.hibernate.validator:hibernate-validator'
+    compile "io.springfox:springfox-swagger2:${springfoxVersion}"
+    compile "io.springfox:springfox-swagger-ui:${springfoxVersion}"
+    compile 'org.postgresql:postgresql'
+    compile "io.lettuce:lettuce-core"
+    compile 'org.flywaydb:flyway-core'
+
+    testCompile('org.springframework.boot:spring-boot-starter-test')
+    testCompile('io.rest-assured:rest-assured:3.0.3')
+    testCompile('io.rest-assured:json-schema-validator:3.0.3')
+    testCompile('io.rest-assured:json-path:3.0.3')
+}
+
+dependencyCheck {
+    failOnError = true
+    format = 'ALL'
+    outputDirectory = "${buildDir}/reports/owasp"
+    suppressionFile = "${projectDir}/owasp-suppressions.xml"
+}
+
+
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            element = 'CLASS'
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = codeCoverageLimit
+            }
+            excludes = [
+                    'com.message.demo.utils.*',
+                    'com.message.demo.config.*',
+                    'com.message.demo.jpa.*',
+                    'com.message.demo.rest.exception.*',
+                    'com.message.demo.Application'
+            ]
+        }
+    }
+}
+
+jacocoTestReport {
+    afterEvaluate {
+        classDirectories = files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: [
+                    'com/message/demo/utils/**',
+                    'com/message/demo/config/**',
+                    'com/message/demo/jpa/**',
+                    'com/message/demo/rest/exception/**'
+            ])
+        })
+    }
+}
+
+
+task copyServiceDockerfile(type: Copy) {
+    from 'src/main/docker'
+    into 'build/libs'
+}
+
+task buildServiceDockerImage(type: Exec) {
+    workingDir "build/libs"
+    commandLine "docker", "build", "--build-arg", "VERSION=${project.version}", "--tag", "${rootProject.name}/${project.name}:${project.version}", "./"
+}
+
+check.dependsOn(test, dependencyCheckAnalyze, jacocoTestReport, jacocoTestCoverageVerification)
+buildServiceDockerImage.dependsOn(check, bootJar, copyServiceDockerfile)
+build.dependsOn(buildServiceDockerImage)

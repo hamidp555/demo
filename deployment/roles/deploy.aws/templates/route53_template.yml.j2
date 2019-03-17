@@ -1,0 +1,19 @@
+Description: Route53 stack template for {{ project_name }} {{ env }}
+
+Parameters:
+  MessagePublicLoadBalancerDNS:
+    Type: String
+
+  MessagePublicLoadBalancerZoneId:
+    Type: String
+
+Resources:
+  DemoRecordSet:
+    Type: "AWS::Route53::RecordSet"
+    Properties:
+      Name: "{{ messageapp_url }}."
+      AliasTarget:
+        DNSName: !Ref MessagePublicLoadBalancerDNS
+        HostedZoneId: !Ref MessagePublicLoadBalancerZoneId
+      HostedZoneName: "{{ domain_name }}."
+      Type: A

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.1.xsd">
+
+    <suppress>
+        <notes><![CDATA[
+   file name: postgresql-42.2.2.jar
+   reason: PostgreSQL version is >= 9.6.9
+   ]]></notes>
+        <gav regex="true">^org\.postgresql:postgresql:.*$</gav>
+        <cve>CVE-2018-1115</cve>
+    </suppress>
+
+</suppressions>

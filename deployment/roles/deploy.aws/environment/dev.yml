@@ -1,0 +1,19 @@
+vpc:
+  cidr: 10.0.0.0/22
+
+domain_name: "hamidp555-demo.com"
+messageapp_url: "{{ domain_name }}"
+logging_level_com_message: INFO
+
+spring_jpa_hibernate_ddlauto: none
+spring_profiles_active: dev
+database_name: "{{ env }}{{ project_name }}"
+database_port: 5432
+database_username: "{{ env }}messageservice"
+database_password: secretpassword
+database_storage: 5
+database_instance_class: db.t2.micro
+database_multiaz: false
+
+logging:
+  retention: 7

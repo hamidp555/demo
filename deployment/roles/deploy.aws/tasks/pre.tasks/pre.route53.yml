@@ -1,0 +1,8 @@
+---
+
+- name: "create a hosted zone for {{ domain_name }} if it doesn't exist"
+  route53_zone:
+    zone: "{{ domain_name }}."
+    state: present
+    region: "{{ region }}"
+    comment: hosted zone for demo messageapp

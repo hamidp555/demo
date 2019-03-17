@@ -1,0 +1,13 @@
+---
+
+- name: get image digest
+  command: aws ecr describe-images --repository-name {{ ecs.repository_name }} --region {{ region }} --query 'imageDetails[?imageTags[0]==`{{ ecs.messageapp.tag }}`].imageDigest'
+  register: image_digest
+
+- name: debug
+  debug:
+    msg: "{{ image_digest }}"
+
+- name: store image digest
+  set_fact:
+    messageapp_digest: "{{ (image_digest.stdout | from_json)[0] }}"
